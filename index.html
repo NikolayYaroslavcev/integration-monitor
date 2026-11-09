@@ -9,6 +9,12 @@
     <meta name="description" content="Мониторинг событий интеграций: вебхуки CRM, статусы и причины ошибок" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>Пульс интеграций</title>
+    <script>
+      try {
+        const t = localStorage.getItem('theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

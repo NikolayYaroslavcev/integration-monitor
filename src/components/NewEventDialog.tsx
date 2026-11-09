@@ -189,17 +189,30 @@ export function NewEventDialog({ open, sources, onClose, onCreated }: Props) {
 
               <div className="grid-2">
                 <Field label="Источник" name="source" error={fieldError('source')}>
-                  <input value={form.source} onChange={set('source')} aria-invalid={!!fieldError('source')} list="source-options" placeholder="amoCRM" autoComplete="off" />
-                  <datalist id="source-options">
-                    {sources.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
+                  <input value={form.source} onChange={set('source')} aria-invalid={!!fieldError('source')} placeholder="например, amoCRM" autoComplete="off" />
                 </Field>
                 <Field label="Тип события" name="type" error={fieldError('type')}>
-                  <input value={form.type} onChange={set('type')} aria-invalid={!!fieldError('type')} placeholder="lead.created" autoComplete="off" spellCheck={false} />
+                  <input value={form.type} onChange={set('type')} aria-invalid={!!fieldError('type')} placeholder="например, lead.created" autoComplete="off" spellCheck={false} />
                 </Field>
               </div>
+
+              {sources.length > 0 && (
+                <div className="presets" role="group" aria-label="Источники из ленты">
+                  <span>Источник из ленты:</span>
+                  {sources.slice(0, 8).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`chip chip--small${form.source === s ? ' is-active' : ''}`}
+                      aria-pressed={form.source === s}
+                      translate="no"
+                      onClick={() => set('source')({ target: { value: s } })}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <fieldset className={`field${fieldError('status') ? ' has-error' : ''}`}>
                 <legend className="field__label">Статус</legend>
@@ -227,7 +240,7 @@ export function NewEventDialog({ open, sources, onClose, onCreated }: Props) {
                 error={fieldError('message')}
                 hint={form.status === 'error' ? 'Для ошибки опишите причину: что пошло не так и где' : undefined}
               >
-                <textarea value={form.message} onChange={set('message')} aria-invalid={!!fieldError('message')} rows={2} placeholder="Заявка успешно передана" />
+                <textarea value={form.message} onChange={set('message')} aria-invalid={!!fieldError('message')} rows={2} placeholder="Что произошло; для ошибки — причина" />
               </Field>
 
               <Field label="Детали (JSON, необязательно)" name="details" error={fieldError('details')}>

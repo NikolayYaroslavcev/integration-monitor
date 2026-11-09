@@ -65,12 +65,14 @@ export function StatsPanel({ events, loading, status, selectedId, onStatus, onSe
 
       <div className="pulse" style={{ animationDelay: '210ms' }}>
         <div className="pulse__head">
-          <span className="pulse__title">Лента активности</span>
+          <span className="pulse__title">
+            Лента активности <span className="pulse__count">· последние {pulse.length}</span>
+          </span>
           <span className="pulse__legend">
             <i className="dot dot--success" /> успех <i className="dot dot--error" /> ошибка
           </span>
         </div>
-        <div className="pulse__track" role="list" aria-label={`Последние ${pulse.length} событий по времени`}>
+        <div className={`pulse__track${pulse.some((e) => e.id === selectedId) ? ' has-selection' : ''}`} role="list" aria-label={`Последние ${pulse.length} событий по времени`}>
           {pulse.map((e) => (
             <button
               key={e.id}
@@ -87,7 +89,8 @@ export function StatsPanel({ events, loading, status, selectedId, onStatus, onSe
         {pulse.length > 1 && (
           <div className="pulse__axis">
             <span>{formatTime(pulse[0].created_at)}</span>
-            <span>сейчас</span>
+            <span>по порядку поступления</span>
+            <span>{formatTime(pulse[pulse.length - 1].created_at)}</span>
           </div>
         )}
       </div>

@@ -1,12 +1,15 @@
 import type { StatusFilter, UrlState } from '../useUrlState';
+import { SourceSelect, type SourceOption } from './SourceSelect';
+
+type FilterPatch = Partial<Pick<UrlState, 'status' | 'q' | 'source'>>;
 
 interface Props {
   status: StatusFilter;
   counts: Record<StatusFilter, number>;
   q: string;
   source: string;
-  sources: string[];
-  onChange: (patch: Partial<UrlState>) => void;
+  sources: SourceOption[];
+  onChange: (patch: FilterPatch) => void;
 }
 
 const TABS: { key: StatusFilter; label: string }[] = [
@@ -18,13 +21,12 @@ const TABS: { key: StatusFilter; label: string }[] = [
 export function Toolbar({ status, counts, q, source, sources, onChange }: Props) {
   return (
     <div className="toolbar">
-      <div className="segmented" role="radiogroup" aria-label="Фильтр по статусу">
+      <div className="segmented" role="group" aria-label="Фильтр по статусу">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
-            role="radio"
-            aria-checked={status === t.key}
+            aria-pressed={status === t.key}
             className={`segmented__item segmented__item--${t.key}${status === t.key ? ' is-active' : ''}`}
             onClick={() => onChange({ status: t.key })}
           >
@@ -48,17 +50,7 @@ export function Toolbar({ status, counts, q, source, sources, onChange }: Props)
             onChange={(e) => onChange({ q: e.target.value })}
           />
         </label>
-        <label className="select">
-          <span className="sr-only">Источник</span>
-          <select value={source} onChange={(e) => onChange({ source: e.target.value })}>
-            <option value="">Все источники</option>
-            {sources.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SourceSelect value={source} options={sources} onChange={(value) => onChange({ source: value })} />
       </div>
     </div>
   );

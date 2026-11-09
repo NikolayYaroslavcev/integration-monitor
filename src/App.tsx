@@ -3,11 +3,13 @@ import type { IntegrationEvent } from '../shared/types';
 import { EventDetail } from './components/EventDetail';
 import { EventList } from './components/EventList';
 import { NewEventDialog } from './components/NewEventDialog';
+import { ThemeToggle } from './components/ThemeToggle';
+import type { SourceOption } from './components/SourceSelect';
 import { StatsPanel } from './components/StatsPanel';
 import { Toolbar } from './components/Toolbar';
 import { formatTime } from './format';
 import { useEvents } from './useEvents';
-import { useUrlState } from './useUrlState';
+import { useUrlState, type UrlState } from './useUrlState';
 
 function matches(e: IntegrationEvent, q: string) {
   if (!q) return true;
@@ -34,7 +36,17 @@ export function App() {
   }, [toast]);
 
   const all = events ?? [];
-  const sources = useMemo(() => [...new Set(all.map((e) => e.source))].sort((a, b) => a.localeCompare(b)), [all]);
+  const sourceStats = useMemo(() => {
+    const map = new Map<string, SourceOption>();
+    for (const e of all) {
+      const s = map.get(e.source) ?? { name: e.source, total: 0, errors: 0 };
+      s.total++;
+      if (e.status === 'error') s.errors++;
+      map.set(e.source, s);
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [all]);
+  const sources = useMemo(() => sourceStats.map((s) => s.name), [sourceStats]);
 
   const scoped = useMemo(
     () => all.filter((e) => (!url.source || e.source === url.source) && matches(e, url.q.trim())),
@@ -54,6 +66,17 @@ export function App() {
   );
 
   const selected = url.event ? all.find((e) => e.id === url.event) : undefined;
+
+  // Changing a filter closes details if the opened event would no longer be in the list.
+  const setFilter = (patch: Partial<Pick<UrlState, 'status' | 'q' | 'source'>>) => {
+    const next = { ...url, ...patch };
+    const stillVisible =
+      selected &&
+      (next.status === 'all' || selected.status === next.status) &&
+      (!next.source || selected.source === next.source) &&
+      matches(selected, next.q.trim());
+    setUrl(stillVisible || !url.event ? patch : { ...patch, event: null });
+  };
   const select = (id: string) => setUrl({ event: id });
 
   useEffect(() => {
@@ -87,7 +110,7 @@ export function App() {
       </a>
       <header className="topbar">
         <div className="brand">
-          <span className="brand__mark" aria-hidden="true">
+          <span className={`brand__mark${error ? ' is-down' : ''}`} aria-hidden="true">
             <svg viewBox="0 0 24 24" width="22" height="22">
               <path d="M2 13h4l2.5-6 4 11 3-8 2 3H22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -98,6 +121,7 @@ export function App() {
           </div>
         </div>
         <div className="topbar__actions">
+          <ThemeToggle />
           <button
             type="button"
             className={`sync${error ? ' sync--down' : ''}`}
@@ -122,7 +146,7 @@ export function App() {
         loading={!events}
         status={url.status}
         selectedId={url.event}
-        onStatus={(status) => setUrl({ status })}
+        onStatus={(status) => setFilter({ status })}
         onSelect={select}
       />
 
@@ -133,8 +157,8 @@ export function App() {
             counts={scopeCounts}
             q={url.q}
             source={url.source}
-            sources={sources}
-            onChange={setUrl}
+            sources={sourceStats}
+            onChange={setFilter}
           />
           <EventList
             events={visible}
@@ -153,6 +177,9 @@ export function App() {
           </p>
         </section>
 
+        {url.event && (
+          <button type="button" className="sheet-backdrop" aria-label="Закрыть подробности" onClick={closeEvent} />
+        )}
         <EventDetail
           event={selected}
           requestedId={url.event}
