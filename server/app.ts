@@ -40,7 +40,30 @@ export function createApp(store = new EventStore(), { staticDir }: { staticDir?:
         fields: toFieldErrors(query.error),
       });
     }
-    res.json(store.list(query.data));
+    const { status, source, offset = 0, limit } = query.data;
+    const all = store.list({ status, source });
+    res.set('X-Total-Count', String(all.length));
+    res.json(all.slice(offset, limit === undefined ? undefined : offset + limit));
+  });
+
+  // Server-Sent Events: every accepted event is pushed to open dashboards right away.
+  app.get('/api/events/stream', (req, res) => {
+    res.set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+    res.write('retry: 3000\n\n');
+    const unsubscribe = store.subscribe((event) => {
+      res.write(`event: created\nid: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`);
+    });
+    const heartbeat = setInterval(() => res.write(': ping\n\n'), 25_000);
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
   });
 
   app.get('/api/events/:id', (req, res) => {

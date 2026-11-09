@@ -50,6 +50,11 @@ export type CreateEventInput = z.infer<typeof createEventSchema>;
 export const listQuerySchema = z.object({
   status: z.enum(EVENT_STATUSES, { error: 'Параметр «status» должен быть «success» или «error»' }).optional(),
   source: z.string({ error: 'Параметр «source» должен быть строкой' }).trim().min(1, 'Параметр «source» пустой').optional(),
+  offset: z.coerce
+    .number({ error: 'Параметр «offset» должен быть числом' })
+    .int('Параметр «offset» должен быть целым числом')
+    .min(0, 'Параметр «offset» не может быть отрицательным')
+    .optional(),
   limit: z.coerce
     .number({ error: 'Параметр «limit» должен быть числом' })
     .int('Параметр «limit» должен быть целым числом')

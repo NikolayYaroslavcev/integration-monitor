@@ -1,6 +1,11 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../server/app.js';
+import { loadEvents, saveEvents } from '../server/persistence.js';
 import { buildSeed } from '../server/seed.js';
 import { EventStore } from '../server/store.js';
 import type { IntegrationEvent } from '../shared/types.js';
@@ -121,5 +126,53 @@ describe('POST /api/events', () => {
   it('returns 409 for a duplicate id', async () => {
     const res = await request(app).post('/api/events').send({ ...valid, id: 'evt-1001' }).expect(409);
     expect(res.body.error).toBe('conflict');
+  });
+});
+
+describe('pagination', () => {
+  it('pages with offset/limit and reports the total in X-Total-Count', async () => {
+    const all = (await request(app).get('/api/events')).body as IntegrationEvent[];
+    const page = await request(app).get('/api/events?offset=5&limit=3').expect(200);
+    expect(page.headers['x-total-count']).toBe(String(all.length));
+    expect(page.body.map((e: IntegrationEvent) => e.id)).toEqual(all.slice(5, 8).map((e) => e.id));
+    const errors = await request(app).get('/api/events?status=error&limit=1');
+    expect(errors.headers['x-total-count']).toBe(String(all.filter((e) => e.status === 'error').length));
+    await request(app).get('/api/events?offset=-1').expect(400);
+  });
+});
+
+describe('GET /api/events/stream (SSE)', () => {
+  it('pushes an accepted event to connected clients', async () => {
+    const server = app.listen(0);
+    const { port } = server.address() as AddressInfo;
+    const controller = new AbortController();
+    try {
+      const res = await fetch(`http://localhost:${port}/api/events/stream`, { signal: controller.signal });
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+      const reader = res.body!.getReader();
+      await request(app).post('/api/events').send({ ...valid, id: 'evt-sse-1' }).expect(201);
+      let text = '';
+      while (!text.includes('evt-sse-1')) text += new TextDecoder().decode((await reader.read()).value);
+      expect(text).toContain('event: created');
+      const data = text.split('\n').find((line) => line.startsWith('data: '))!;
+      expect(JSON.parse(data.slice(6))).toMatchObject({ id: 'evt-sse-1', source: 'amoCRM' });
+    } finally {
+      controller.abort();
+      server.close();
+    }
+  });
+});
+
+describe('file persistence', () => {
+  it('saves events atomically and loads them back; a corrupt file falls back to null', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'im-'));
+    const file = path.join(dir, 'events.json');
+    expect(loadEvents(file)).toBeNull();
+    const events = buildSeed();
+    saveEvents(file, events);
+    expect(loadEvents(file)).toEqual(events);
+    writeFileSync(file, '{ broken');
+    expect(loadEvents(file)).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
   });
 });
