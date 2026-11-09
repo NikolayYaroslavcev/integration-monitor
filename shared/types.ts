@@ -17,7 +17,7 @@ export interface FieldError {
 }
 
 export interface ApiError {
-  error: 'validation_error' | 'invalid_json' | 'conflict' | 'not_found' | 'payload_too_large' | 'internal_error';
+  error: 'validation_error' | 'invalid_json' | 'unsupported_media_type' | 'conflict' | 'not_found' | 'payload_too_large' | 'internal_error';
   message: string;
   fields?: FieldError[];
 }

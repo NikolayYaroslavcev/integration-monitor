@@ -54,7 +54,7 @@ export function createApp(store = new EventStore(), { staticDir }: { staticDir?:
     const hasBody = req.headers['transfer-encoding'] !== undefined || Number(req.headers['content-length'] ?? 0) > 0;
     if (hasBody && !req.is('application/json')) {
       return sendError(res, 415, {
-        error: 'validation_error',
+        error: 'unsupported_media_type',
         message: 'Ожидается Content-Type: application/json',
       });
     }

@@ -39,12 +39,21 @@ export const createEventSchema = z
       .record(z.string(), z.unknown(), { error: 'Поле «details» должно быть объектом' })
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((e) => e.status !== 'error' || e.message.length >= 10, {
+    path: ['message'],
+    message: 'Для события с ошибкой опишите причину понятнее (не короче 10 символов)',
+  });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
 export const listQuerySchema = z.object({
-  status: z.enum(EVENT_STATUSES).optional(),
-  source: z.string().trim().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(1000).optional(),
+  status: z.enum(EVENT_STATUSES, { error: 'Параметр «status» должен быть «success» или «error»' }).optional(),
+  source: z.string({ error: 'Параметр «source» должен быть строкой' }).trim().min(1, 'Параметр «source» пустой').optional(),
+  limit: z.coerce
+    .number({ error: 'Параметр «limit» должен быть числом' })
+    .int('Параметр «limit» должен быть целым числом')
+    .min(1, 'Параметр «limit»: от 1 до 1000')
+    .max(1000, 'Параметр «limit»: от 1 до 1000')
+    .optional(),
 });

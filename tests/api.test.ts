@@ -37,9 +37,10 @@ describe('GET /api/events', () => {
     expect(amo.every((e) => e.source === 'amoCRM')).toBe(true);
   });
 
-  it('rejects an unknown status filter', async () => {
+  it('rejects an unknown status filter with a readable message', async () => {
     const res = await request(app).get('/api/events?status=pending').expect(400);
     expect(res.body.error).toBe('validation_error');
+    expect(res.body.fields[0]).toEqual({ field: 'status', message: 'Параметр «status» должен быть «success» или «error»' });
   });
 
   it('returns a single event and 404 for a missing one', async () => {
@@ -85,6 +86,7 @@ describe('POST /api/events', () => {
     [{ ...valid, id: 'evt 1' }, 'id'],
     [{ ...valid, details: 'text' }, 'details'],
     [{ ...valid, staus: 'error' }, 'staus'],
+    [{ ...valid, status: 'error', message: 'Ошибка' }, 'message'],
   ])('rejects invalid field %#', async (body, field) => {
     const res = await request(app).post('/api/events').send(body).expect(400);
     expect(res.body.fields.map((f: { field: string }) => f.field)).toContain(field);
