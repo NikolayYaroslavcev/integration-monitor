@@ -15,6 +15,8 @@ export function useEvents() {
   const [freshIds, setFreshIds] = useState<ReadonlySet<string>>(new Set());
   const known = useRef<Set<string> | null>(null);
   const requestSeq = useRef(0);
+  const [live, setLive] = useState(false);
+  const liveRef = useRef(false);
 
   const markFresh = useCallback((ids: string[]) => {
     if (!ids.length) return;
@@ -55,16 +57,39 @@ export function useEvents() {
     [markFresh],
   );
 
+  // New events arrive over SSE; polling is only the fallback while the stream is down.
   useEffect(() => {
     void refresh();
-    const tick = () => document.visibilityState === 'visible' && void refresh();
-    const timer = setInterval(tick, POLL_MS);
-    document.addEventListener('visibilitychange', tick);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', tick);
+    const setLiveState = (value: boolean) => {
+      liveRef.current = value;
+      setLive(value);
     };
-  }, [refresh]);
+    const stream = typeof EventSource === 'undefined' ? null : new EventSource('/api/events/stream');
+    if (stream) {
+      stream.onopen = () => {
+        setLiveState(true);
+        void refresh(); // catch up on anything sent while disconnected
+      };
+      stream.onerror = () => setLiveState(false);
+      stream.addEventListener('created', (message) => {
+        try {
+          addLocal(JSON.parse((message as MessageEvent<string>).data) as IntegrationEvent);
+          setSyncedAt(new Date());
+        } catch {
+          void refresh();
+        }
+      });
+    }
+    const tick = () => document.visibilityState === 'visible' && !liveRef.current && void refresh();
+    const timer = setInterval(tick, POLL_MS);
+    const onVisible = () => document.visibilityState === 'visible' && void refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      stream?.close();
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refresh, addLocal]);
 
-  return { events, error, syncedAt, freshIds, refresh, addLocal };
+  return { events, error, syncedAt, live, freshIds, refresh, addLocal };
 }

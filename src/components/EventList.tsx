@@ -1,9 +1,12 @@
+import { useEffect, useRef } from 'react';
 import type { IntegrationEvent } from '../../shared/types';
 import { formatDay, formatRelative, formatTime } from '../format';
 import { StatusBadge } from './StatusBadge';
 
 interface Props {
   events: IntegrationEvent[];
+  total: number;
+  onMore: () => void;
   loading: boolean;
   loadError: string | null;
   onRetry: () => void;
@@ -15,7 +18,7 @@ interface Props {
   onReset: () => void;
 }
 
-export function EventList({ events, loading, loadError, onRetry, selectedId, freshIds, now, onSelect, filtered, onReset }: Props) {
+export function EventList({ events, total, onMore, loading, loadError, onRetry, selectedId, freshIds, now, onSelect, filtered, onReset }: Props) {
   if (loadError) {
     return (
       <div className="empty empty--error">
@@ -106,6 +109,31 @@ export function EventList({ events, loading, loadError, onRetry, selectedId, fre
           </ul>
         </section>
       ))}
+      {events.length < total && <LoadMore shown={events.length} total={total} onMore={onMore} />}
+    </div>
+  );
+}
+
+function LoadMore({ shown, total, onMore }: { shown: number; total: number; onMore: () => void }) {
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  // Loads the next page automatically as the end of the list scrolls into view; the button stays for keyboard users.
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => entries[0].isIntersecting && onMore(), { rootMargin: '400px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onMore, shown]);
+
+  return (
+    <div className="load-more" ref={sentinel}>
+      <span>
+        Показано {shown} из {total}
+      </span>
+      <button type="button" className="btn" onClick={onMore}>
+        Показать ещё {Math.min(50, total - shown)}
+      </button>
     </div>
   );
 }

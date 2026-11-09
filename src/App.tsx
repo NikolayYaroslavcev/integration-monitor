@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IntegrationEvent } from '../shared/types';
 import { EventDetail } from './components/EventDetail';
 import { EventList } from './components/EventList';
@@ -17,8 +17,12 @@ function matches(e: IntegrationEvent, q: string) {
   return [e.id, e.source, e.type, e.message].some((v) => v.toLowerCase().includes(needle));
 }
 
+const PAGE_SIZE = 50;
+
 export function App() {
-  const { events, error, syncedAt, freshIds, refresh, addLocal } = useEvents();
+  const { events, error, syncedAt, live, freshIds, refresh, addLocal } = useEvents();
+  const [pageLimit, setPageLimit] = useState(PAGE_SIZE);
+  const loadMore = useCallback(() => setPageLimit((n) => n + PAGE_SIZE), []);
   const [url, setUrl, closeEvent] = useUrlState();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -66,6 +70,9 @@ export function App() {
   );
 
   const selected = url.event ? all.find((e) => e.id === url.event) : undefined;
+  // The list renders in pages; an opened event deeper in the list is always rendered.
+  const shownCount = Math.max(pageLimit, visible.findIndex((e) => e.id === url.event) + 1);
+  const shown = useMemo(() => visible.slice(0, shownCount), [visible, shownCount]);
 
   // Changing a filter closes details if the opened event would no longer be in the list.
   const setFilter = (patch: Partial<Pick<UrlState, 'status' | 'q' | 'source'>>) => {
@@ -75,6 +82,7 @@ export function App() {
       (next.status === 'all' || selected.status === next.status) &&
       (!next.source || selected.source === next.source) &&
       matches(selected, next.q.trim());
+    setPageLimit(PAGE_SIZE);
     setUrl(stillVisible || !url.event ? patch : { ...patch, event: null });
   };
   const select = (id: string) => setUrl({ event: id });
@@ -95,7 +103,7 @@ export function App() {
       const idx = visible.findIndex((e) => e.id === url.event);
       const next = visible[Math.min(visible.length - 1, Math.max(0, idx === -1 ? 0 : idx + step))];
       setUrl({ event: next.id });
-      document.getElementById(`row-${next.id}`)?.scrollIntoView({ block: 'nearest' });
+      requestAnimationFrame(() => document.getElementById(`row-${next.id}`)?.scrollIntoView({ block: 'nearest' }));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -126,11 +134,11 @@ export function App() {
             type="button"
             className={`sync${error ? ' sync--down' : ''}`}
             onClick={() => void refresh()}
-            title="Обновить сейчас (автообновление каждые 5 с)"
+            title={live ? 'Новые события приходят сразу (Server-Sent Events). Нажмите, чтобы обновить вручную' : 'Обновить сейчас'}
           >
             <span className="sync__dot" aria-hidden="true" />
             <span className="sync__label">
-              {error ? 'Нет связи с API' : syncedAt ? `Обновлено в ${formatTime(syncedAt.toISOString())}` : 'Подключение…'}
+              {error ? 'Нет связи с API' : live ? 'В реальном времени' : syncedAt ? `Обновлено в ${formatTime(syncedAt.toISOString())}` : 'Подключение…'}
             </span>
           </button>
           <button type="button" className="btn btn--primary" onClick={() => setDialogOpen(true)} aria-label="Добавить тестовое событие">
@@ -161,7 +169,9 @@ export function App() {
             onChange={setFilter}
           />
           <EventList
-            events={visible}
+            events={shown}
+            total={visible.length}
+            onMore={loadMore}
             loading={!events}
             loadError={events ? null : error}
             onRetry={() => void refresh()}
@@ -170,7 +180,7 @@ export function App() {
             now={now}
             onSelect={select}
             filtered={hasScope}
-            onReset={() => setUrl({ status: 'all', q: '', source: '' })}
+            onReset={() => setFilter({ status: 'all', q: '', source: '' })}
           />
           <p className="hint" aria-hidden="true">
             <kbd>↑</kbd> <kbd>↓</kbd> — переход по событиям, <kbd>Esc</kbd> — закрыть подробности
