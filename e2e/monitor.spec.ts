@@ -9,15 +9,15 @@ async function open(page: Page, path = '/') {
   await expect(statValue(page, 'all')).toHaveText(/^\d+$/);
 }
 
-test('stats match the events in the list', async ({ page }) => {
+test('stats match the events returned by the API', async ({ page, request }) => {
   await open(page);
-  const total = await rows(page).count();
-  const ok = await page.locator('.list .row--success').count();
-  const failed = await page.locator('.list .row--error').count();
-  expect(total).toBeGreaterThanOrEqual(8);
-  await expect(statValue(page, 'all')).toHaveText(String(total));
-  await expect(statValue(page, 'success')).toHaveText(String(ok));
-  await expect(statValue(page, 'error')).toHaveText(String(failed));
+  const events: { status: string }[] = await (await request.get('/api/events')).json();
+  expect(events.length).toBeGreaterThanOrEqual(8);
+  await expect(statValue(page, 'all')).toHaveText(String(events.length));
+  await expect(statValue(page, 'success')).toHaveText(String(events.filter((e) => e.status === 'success').length));
+  await expect(statValue(page, 'error')).toHaveText(String(events.filter((e) => e.status === 'error').length));
+  const shown = await rows(page).count();
+  expect(shown).toBe(Math.min(50, events.length));
 });
 
 test('status filter shows only matching events and is kept in the URL', async ({ page }) => {
@@ -26,14 +26,14 @@ test('status filter shows only matching events and is kept in the URL', async ({
 
   await page.getByRole('group', { name: 'Фильтр по статусу' }).getByRole('button', { name: /Ошибка/ }).click();
   await expect(page).toHaveURL(/status=error/);
-  await expect(rows(page)).toHaveCount(errors);
+  await expect(rows(page)).toHaveCount(Math.min(50, errors));
   await expect(page.locator('.list .row--success')).toHaveCount(0);
 
   await page.reload();
-  await expect(rows(page)).toHaveCount(errors);
+  await expect(rows(page)).toHaveCount(Math.min(50, errors));
 
   await page.getByRole('group', { name: 'Фильтр по статусу' }).getByRole('button', { name: /Все/ }).click();
-  await expect(rows(page)).toHaveCount(Number(await statValue(page, 'all').innerText()));
+  await expect(rows(page)).toHaveCount(Math.min(50, Number(await statValue(page, 'all').innerText())));
 });
 
 test('opening an event shows its details, Esc closes them', async ({ page }) => {
@@ -61,7 +61,9 @@ test('event POSTed to the API appears in the list without reload', async ({ page
   expect(res.status()).toBe(201);
   const { id } = await res.json();
 
-  await expect(page.locator(`#row-${id}`)).toBeVisible({ timeout: 10_000 });
+  // Delivered over SSE: well under the 5 s polling fallback.
+  await expect(page.locator('.sync')).toContainText('В реальном времени');
+  await expect(page.locator(`#row-${id}`)).toBeVisible({ timeout: 2_000 });
   await expect(statValue(page, 'all')).toHaveText(String(before + 1));
 });
 
@@ -138,4 +140,20 @@ test('theme toggle cycles system → light → dark and survives a reload', asyn
   expect(await theme()).toBe('dark');
   await toggle.click();
   expect(await theme()).toBe('system');
+});
+
+test('long lists render in pages of 50 and load more on demand', async ({ page, request, isMobile }) => {
+  test.skip(isMobile, 'same logic on every screen size');
+  const total = (await (await request.get('/api/events')).json()).length;
+  for (let i = total; i < 60; i++) {
+    await request.post('/api/events', {
+      data: { source: 'Tilda', type: 'form.submitted', status: 'success', message: `Пакетная заявка №${i}` },
+    });
+  }
+  await open(page);
+  await expect(rows(page)).toHaveCount(50);
+  await expect(page.locator('.load-more')).toContainText('Показано 50 из');
+  await page.locator('.load-more button').click();
+  await expect(page.locator('.load-more')).toHaveCount(0);
+  expect(await rows(page).count()).toBeGreaterThanOrEqual(60);
 });

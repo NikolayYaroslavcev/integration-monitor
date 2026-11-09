@@ -10,7 +10,7 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}` },
   webServer: {
     command: 'npm run build && npm start',
-    env: { PORT: String(PORT) },
+    env: { PORT: String(PORT), DATA_FILE: '' },
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,

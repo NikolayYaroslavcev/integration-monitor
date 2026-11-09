@@ -13,6 +13,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY shared ./shared
+RUN mkdir -p data && chown node:node data
 EXPOSE 3001
 USER node
 CMD ["node_modules/.bin/tsx", "server/index.ts"]
