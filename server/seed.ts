@@ -1,0 +1,127 @@
+import type { IntegrationEvent } from '../shared/types.js';
+
+// Fictional data. Timestamps are relative to server start so the feed always looks recent.
+type SeedRow = Omit<IntegrationEvent, 'created_at'> & { minutesAgo: number };
+
+const rows: SeedRow[] = [
+  {
+    id: 'evt-1012',
+    source: 'amoCRM',
+    type: 'lead.created',
+    status: 'success',
+    minutesAgo: 3,
+    message: 'Заявка «Консультация по тарифу» передана в воронку «Продажи»',
+    details: { http_status: 200, duration_ms: 182, attempt: 1, payload: { lead_id: 48211, pipeline: 'Продажи', price: 45000 } },
+  },
+  {
+    id: 'evt-1011',
+    source: 'YooKassa (test)',
+    type: 'payment.failed',
+    status: 'error',
+    minutesAgo: 9,
+    message: 'Платёж не сопоставлен со сделкой: в metadata нет order_id',
+    details: { http_status: 422, error_code: 'ORDER_ID_MISSING', attempt: 1, payload: { payment_id: 'pay_test_7781', amount: '1990.00', currency: 'RUB', metadata: {} } },
+  },
+  {
+    id: 'evt-1010',
+    source: 'Bitrix24',
+    type: 'deal.updated',
+    status: 'success',
+    minutesAgo: 17,
+    message: 'Сделка #3307 переведена на этап «Счёт выставлен»',
+    details: { http_status: 200, duration_ms: 241, attempt: 1, payload: { deal_id: 3307, stage: 'INVOICE' } },
+  },
+  {
+    id: 'evt-1009',
+    source: 'amoCRM',
+    type: 'contact.updated',
+    status: 'error',
+    minutesAgo: 26,
+    message: 'Истёк access token интеграции — CRM ответила 401 Unauthorized',
+    details: { http_status: 401, error_code: 'TOKEN_EXPIRED', attempt: 3, hint: 'Обновите токен через refresh_token в настройках интеграции', payload: { contact_id: 99120 } },
+  },
+  {
+    id: 'evt-1008',
+    source: 'Tilda',
+    type: 'form.submitted',
+    status: 'success',
+    minutesAgo: 41,
+    message: 'Заявка с формы «Обратный звонок» создана как лид',
+    details: { http_status: 200, duration_ms: 96, attempt: 1, payload: { form_id: 'form-callback', page: '/pricing' } },
+  },
+  {
+    id: 'evt-1007',
+    source: 'RetailCRM',
+    type: 'order.created',
+    status: 'success',
+    minutesAgo: 58,
+    message: 'Заказ #A-5521 выгружен на склад',
+    details: { http_status: 201, duration_ms: 310, attempt: 1, payload: { order_number: 'A-5521', items: 3, total: 12480 } },
+  },
+  {
+    id: 'evt-1006',
+    source: 'Bitrix24',
+    type: 'lead.created',
+    status: 'error',
+    minutesAgo: 84,
+    message: 'Лид отклонён: не заполнено обязательное поле «Телефон»',
+    details: { http_status: 400, error_code: 'REQUIRED_FIELD_PHONE', attempt: 1, payload: { title: 'Заявка с сайта', phone: null } },
+  },
+  {
+    id: 'evt-1005',
+    source: 'Telegram Bot',
+    type: 'message.received',
+    status: 'success',
+    minutesAgo: 112,
+    message: 'Сообщение из бота привязано к контакту и сделке',
+    details: { http_status: 200, duration_ms: 74, attempt: 1, payload: { chat_type: 'private', has_attachment: false } },
+  },
+  {
+    id: 'evt-1004',
+    source: 'RetailCRM',
+    type: 'order.status_changed',
+    status: 'error',
+    minutesAgo: 167,
+    message: 'Таймаут ответа склада: нет ответа за 30 с, событие отправлено на повтор',
+    details: { http_status: 504, error_code: 'UPSTREAM_TIMEOUT', attempt: 2, next_retry_in_s: 300, payload: { order_number: 'A-5498', status: 'assembling' } },
+  },
+  {
+    id: 'evt-1003',
+    source: 'amoCRM',
+    type: 'lead.status_changed',
+    status: 'success',
+    minutesAgo: 230,
+    message: 'Статус сделки синхронизирован: «Переговоры» → «Успешно реализовано»',
+    details: { http_status: 200, duration_ms: 205, attempt: 1, payload: { lead_id: 48102, from: 'Переговоры', to: 'Успешно реализовано' } },
+  },
+  {
+    id: 'evt-1002',
+    source: 'YooKassa (test)',
+    type: 'payment.succeeded',
+    status: 'success',
+    minutesAgo: 315,
+    message: 'Оплата 4 990 ₽ зачислена, сделка отмечена оплаченной',
+    details: { http_status: 200, duration_ms: 158, attempt: 1, payload: { payment_id: 'pay_test_7702', amount: '4990.00', currency: 'RUB' } },
+  },
+  {
+    id: 'evt-1001',
+    source: 'Tilda',
+    type: 'form.submitted',
+    status: 'success',
+    minutesAgo: 402,
+    message: 'Заявка успешно передана',
+    details: { http_status: 200, duration_ms: 88, attempt: 1, payload: { form_id: 'form-main', page: '/' } },
+  },
+];
+
+export function buildSeed(now = Date.now()): IntegrationEvent[] {
+  return rows.map(({ minutesAgo, id, source, type, status, message, details }) => ({
+    id,
+    source,
+    type,
+    status,
+    created_at: new Date(now - minutesAgo * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    message,
+    details,
+  }));
+}
